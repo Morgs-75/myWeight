@@ -528,10 +528,9 @@
           <header>
             <div>
               <h1>myWeight</h1>
-              <div class="subtitle">Private, offline-first tracker stored in your browser.</div>
             </div>
             <div class="header-actions">
-              <div class="subtitle" id="storageStatus">Storage: Local browser</div>
+              <div class="subtitle" id="storageStatus"></div>
             </div>
           </header>
 
@@ -551,12 +550,10 @@
               <div class="col-12" style="display:flex; gap:10px; flex-wrap:wrap;">
                 <button id="loginBtn">Sign In</button>
                 <button class="secondary" id="signupBtn">Create Account</button>
-                <button class="ghost" id="continueBtn">Continue</button>
                 <button class="ghost" id="magicLinkBtn">Send Magic Link</button>
                 <button class="ghost" id="resetPassBtn">Reset Password</button>
               </div>
               <div class="col-12">
-                <div class="note">This is a UI-only mock until we add Supabase auth.</div>
               </div>
             </div>
           </section>
@@ -565,8 +562,6 @@
             <section class="card grid">
               <div class="col-12 entry-hero">
                 <h1>myWeight</h1>
-                <div class="subtitle">Private, offline-first tracker stored in your browser.</div>
-                <div class="subtitle">Storage: Local browser</div>
               </div>
               <div class="col-6">
                 <label for="date">Date</label>
@@ -710,8 +705,8 @@
     const GOAL_KEY = "weight-goal-v1";
     const UNIT_KEY = "weight-unit-v1";
 
-    const SUPABASE_URL = "";
-    const SUPABASE_ANON_KEY = "";
+    const SUPABASE_URL = "https://axcrgtcqtfygoxheqqhb.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4Y3JndGNxdGZ5Z294aGVxcWhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0NzA0NjMsImV4cCI6MjA4NjA0NjQ2M30.CdaYOJdXrXevtOrvlvUKhXLY9jecbPE2yudIBwRoPN8";
     const supabaseClient = (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase)
       ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
       : null;
@@ -730,7 +725,6 @@
     const loginPassEl = document.getElementById("loginPass");
     const loginBtn = document.getElementById("loginBtn");
     const signupBtn = document.getElementById("signupBtn");
-    const continueBtn = document.getElementById("continueBtn");
     const magicLinkBtn = document.getElementById("magicLinkBtn");
     const resetPassBtn = document.getElementById("resetPassBtn");
 
@@ -938,15 +932,15 @@
     function setAuthStatus() {
       if (!isSupabaseReady()) {
         authStatusEl.textContent = "Auth: Disabled (set Supabase keys)";
-        if (storageStatusEl) storageStatusEl.textContent = "Storage: Local browser";
+        if (storageStatusEl) storageStatusEl.textContent = "";
         return;
       }
       if (isAuthed()) {
         authStatusEl.textContent = `Auth: ${supabaseSession.user.email}`;
-        if (storageStatusEl) storageStatusEl.textContent = "Storage: Supabase";
+        if (storageStatusEl) storageStatusEl.textContent = "";
       } else {
         authStatusEl.textContent = "Auth: Signed out";
-        if (storageStatusEl) storageStatusEl.textContent = "Storage: Local browser";
+        if (storageStatusEl) storageStatusEl.textContent = "";
       }
     }
 
@@ -1543,7 +1537,6 @@
     resetPassBtn.addEventListener("click", resetPassword);
     signOutBtn.addEventListener("click", signOut);
     saveProfileBtn.addEventListener("click", saveProfileFromInputs);
-    continueBtn.addEventListener("click", () => switchPage("entry"));
 
     async function initApp() {
       dateEl.value = todayISO();

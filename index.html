@@ -552,6 +552,8 @@
                 <button id="loginBtn">Sign In</button>
                 <button class="secondary" id="signupBtn">Create Account</button>
                 <button class="ghost" id="continueBtn">Continue</button>
+                <button class="ghost" id="magicLinkBtn">Send Magic Link</button>
+                <button class="ghost" id="resetPassBtn">Reset Password</button>
               </div>
               <div class="col-12">
                 <div class="note">This is a UI-only mock until we add Supabase auth.</div>
@@ -679,6 +681,16 @@
       </select>
       <div class="note">Used for all entries, stats, and goals.</div>
       <div style="height:12px;"></div>
+      <label for="profileName">Name</label>
+      <input id="profileName" type="text" placeholder="Your name" />
+      <label for="profileTimezone" style="margin-top:10px;">Timezone</label>
+      <input id="profileTimezone" type="text" placeholder="e.g., Australia/Sydney" />
+      <label for="profileHeight" style="margin-top:10px;">Height (optional)</label>
+      <input id="profileHeight" type="number" step="0.1" min="0" placeholder="e.g., 175" />
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+        <button id="saveProfileBtn">Save Profile</button>
+      </div>
+      <div style="height:12px;"></div>
       <label for="goalWeight">Goal Weight</label>
       <input id="goalWeight" type="number" step="0.1" min="0" placeholder="e.g., 170" />
       <label for="goalDate" style="margin-top:10px;">Goal Date</label>
@@ -719,12 +731,18 @@
     const loginBtn = document.getElementById("loginBtn");
     const signupBtn = document.getElementById("signupBtn");
     const continueBtn = document.getElementById("continueBtn");
+    const magicLinkBtn = document.getElementById("magicLinkBtn");
+    const resetPassBtn = document.getElementById("resetPassBtn");
 
     const defaultUnitEl = document.getElementById("defaultUnit");
     const closeSettingsBtn = document.getElementById("closeSettings");
     const settingsBackdrop = document.getElementById("settingsBackdrop");
     const authStatusEl = document.getElementById("authStatus");
     const signOutBtn = document.getElementById("signOutBtn");
+    const profileNameEl = document.getElementById("profileName");
+    const profileTimezoneEl = document.getElementById("profileTimezone");
+    const profileHeightEl = document.getElementById("profileHeight");
+    const saveProfileBtn = document.getElementById("saveProfileBtn");
 
     const goalWeightEl = document.getElementById("goalWeight");
     const goalDateEl = document.getElementById("goalDate");
@@ -889,6 +907,34 @@
       localStorage.setItem(UNIT_KEY, unit);
     }
 
+    async function loadProfile() {
+      if (!isAuthed()) return null;
+      const { data, error } = await supabaseClient
+        .from("profiles")
+        .select("full_name,timezone,height_cm")
+        .eq("id", supabaseSession.user.id)
+        .maybeSingle();
+      if (error) {
+        console.error(error);
+        return null;
+      }
+      return data || null;
+    }
+
+    async function saveProfile(profile) {
+      if (!isAuthed()) return;
+      const payload = {
+        id: supabaseSession.user.id,
+        full_name: profile.full_name || null,
+        timezone: profile.timezone || null,
+        height_cm: profile.height_cm || null
+      };
+      const { error } = await supabaseClient
+        .from("profiles")
+        .upsert(payload);
+      if (error) console.error(error);
+    }
+
     function setAuthStatus() {
       if (!isSupabaseReady()) {
         authStatusEl.textContent = "Auth: Disabled (set Supabase keys)";
@@ -924,6 +970,16 @@
       const existingGoal = await loadGoal();
       syncGoalInputs(existingGoal);
       updateGoalDays();
+      const profile = await loadProfile();
+      if (profile) {
+        profileNameEl.value = profile.full_name || "";
+        profileTimezoneEl.value = profile.timezone || "";
+        profileHeightEl.value = profile.height_cm ?? "";
+      } else {
+        profileNameEl.value = "";
+        profileTimezoneEl.value = "";
+        profileHeightEl.value = "";
+      }
       renderSafe();
     }
 
@@ -958,6 +1014,52 @@
         alert("Check your email to confirm your account.");
       }
       switchPage("entry");
+    }
+
+    async function sendMagicLink() {
+      if (!isSupabaseReady()) {
+        alert("Set SUPABASE_URL and SUPABASE_ANON_KEY in the code first.");
+        return;
+      }
+      const email = loginEmailEl.value.trim();
+      const { error } = await supabaseClient.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: window.location.href }
+      });
+      if (error) {
+        alert(error.message);
+        return;
+      }
+      alert("Magic link sent. Check your email.");
+    }
+
+    async function resetPassword() {
+      if (!isSupabaseReady()) {
+        alert("Set SUPABASE_URL and SUPABASE_ANON_KEY in the code first.");
+        return;
+      }
+      const email = loginEmailEl.value.trim();
+      const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.href
+      });
+      if (error) {
+        alert(error.message);
+        return;
+      }
+      alert("Password reset email sent.");
+    }
+
+    async function saveProfileFromInputs() {
+      if (!isAuthed()) {
+        alert("Sign in to save your profile.");
+        return;
+      }
+      await saveProfile({
+        full_name: profileNameEl.value.trim(),
+        timezone: profileTimezoneEl.value.trim(),
+        height_cm: profileHeightEl.value ? Number(profileHeightEl.value) : null
+      });
+      alert("Profile saved.");
     }
 
     async function signOut() {
@@ -1437,7 +1539,10 @@
 
     loginBtn.addEventListener("click", signIn);
     signupBtn.addEventListener("click", signUp);
+    magicLinkBtn.addEventListener("click", sendMagicLink);
+    resetPassBtn.addEventListener("click", resetPassword);
     signOutBtn.addEventListener("click", signOut);
+    saveProfileBtn.addEventListener("click", saveProfileFromInputs);
     continueBtn.addEventListener("click", () => switchPage("entry"));
 
     async function initApp() {

@@ -663,12 +663,15 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <div class="modal-backdrop" id="settingsBackdrop" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
       <div class="modal-header">
         <div id="settingsTitle" style="font-weight:600;">Settings</div>
         <button id="closeSettings" class="icon-btn">Close</button>
       </div>
+      <div class="note" id="authStatus">Auth: Not connected</div>
+      <button id="signOutBtn" class="ghost" style="margin:10px 0;">Sign Out</button>
       <label for="defaultUnit">Default Unit</label>
       <select id="defaultUnit">
         <option value="lb">lb</option>
@@ -695,6 +698,13 @@
     const GOAL_KEY = "weight-goal-v1";
     const UNIT_KEY = "weight-unit-v1";
 
+    const SUPABASE_URL = "";
+    const SUPABASE_ANON_KEY = "";
+    const supabaseClient = (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase)
+      ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+      : null;
+    let supabaseSession = null;
+
     const dateEl = document.getElementById("date");
     const weightEl = document.getElementById("weight");
     const notesEl = document.getElementById("notes");
@@ -703,10 +713,18 @@
     const chart = document.getElementById("chart");
     const ctx = chart.getContext("2d");
     const deleteBtn = document.getElementById("deleteBtn");
+    const storageStatusEl = document.getElementById("storageStatus");
+    const loginEmailEl = document.getElementById("loginEmail");
+    const loginPassEl = document.getElementById("loginPass");
+    const loginBtn = document.getElementById("loginBtn");
+    const signupBtn = document.getElementById("signupBtn");
+    const continueBtn = document.getElementById("continueBtn");
 
     const defaultUnitEl = document.getElementById("defaultUnit");
     const closeSettingsBtn = document.getElementById("closeSettings");
     const settingsBackdrop = document.getElementById("settingsBackdrop");
+    const authStatusEl = document.getElementById("authStatus");
+    const signOutBtn = document.getElementById("signOutBtn");
 
     const goalWeightEl = document.getElementById("goalWeight");
     const goalDateEl = document.getElementById("goalDate");
@@ -723,7 +741,15 @@
       return local.toISOString().slice(0, 10);
     }
 
-    function loadEntries() {
+    function isSupabaseReady() {
+      return !!supabaseClient;
+    }
+
+    function isAuthed() {
+      return !!(supabaseClient && supabaseSession && supabaseSession.user);
+    }
+
+    function loadEntriesLocal() {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return [];
       try {
@@ -733,11 +759,52 @@
       }
     }
 
-    function saveEntries(entries) {
+    function saveEntriesLocal(entries) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
     }
 
-    function loadGoal() {
+    async function loadEntries() {
+      if (isAuthed()) {
+        const { data, error } = await supabaseClient
+          .from("weight_entries")
+          .select("id,date,weight,notes")
+          .eq("user_id", supabaseSession.user.id)
+          .order("date", { ascending: true });
+        if (error) {
+          console.error(error);
+          return [];
+        }
+        return data || [];
+      }
+      return loadEntriesLocal();
+    }
+
+    async function saveEntryRemote(entry) {
+      if (!isAuthed()) return;
+      const payload = {
+        id: entry.id || undefined,
+        user_id: supabaseSession.user.id,
+        date: entry.date,
+        weight: entry.weight,
+        notes: entry.notes || ""
+      };
+      const { error } = await supabaseClient
+        .from("weight_entries")
+        .upsert(payload, { onConflict: "user_id,date" });
+      if (error) console.error(error);
+    }
+
+    async function deleteEntryRemote(entryId) {
+      if (!isAuthed()) return;
+      const { error } = await supabaseClient
+        .from("weight_entries")
+        .delete()
+        .eq("user_id", supabaseSession.user.id)
+        .eq("id", entryId);
+      if (error) console.error(error);
+    }
+
+    function loadGoalLocal() {
       const raw = localStorage.getItem(GOAL_KEY);
       if (!raw) return null;
       try {
@@ -747,7 +814,43 @@
       }
     }
 
-    function saveGoal(goal) {
+    async function loadGoal() {
+      if (isAuthed()) {
+        const { data, error } = await supabaseClient
+          .from("weight_goals")
+          .select("goal_weight,goal_date")
+          .eq("user_id", supabaseSession.user.id)
+          .maybeSingle();
+        if (error) {
+          console.error(error);
+          return null;
+        }
+        if (!data) return null;
+        return { weight: Number(data.goal_weight), date: data.goal_date || "" };
+      }
+      return loadGoalLocal();
+    }
+
+    async function saveGoal(goal) {
+      if (isAuthed()) {
+        if (!goal) {
+          const { error } = await supabaseClient
+            .from("weight_goals")
+            .delete()
+            .eq("user_id", supabaseSession.user.id);
+          if (error) console.error(error);
+          return;
+        }
+        const { error } = await supabaseClient
+          .from("weight_goals")
+          .upsert({
+            user_id: supabaseSession.user.id,
+            goal_weight: goal.weight,
+            goal_date: goal.date || null
+          });
+        if (error) console.error(error);
+        return;
+      }
       if (!goal) {
         localStorage.removeItem(GOAL_KEY);
         return;
@@ -755,12 +858,112 @@
       localStorage.setItem(GOAL_KEY, JSON.stringify(goal));
     }
 
-    function loadUnit() {
+    function loadUnitLocal() {
       return localStorage.getItem(UNIT_KEY) || "lb";
     }
 
-    function saveUnit(unit) {
+    async function loadUnit() {
+      if (isAuthed()) {
+        const { data, error } = await supabaseClient
+          .from("user_settings")
+          .select("unit")
+          .eq("user_id", supabaseSession.user.id)
+          .maybeSingle();
+        if (error) {
+          console.error(error);
+          return "lb";
+        }
+        return data?.unit || "lb";
+      }
+      return loadUnitLocal();
+    }
+
+    async function saveUnit(unit) {
+      if (isAuthed()) {
+        const { error } = await supabaseClient
+          .from("user_settings")
+          .upsert({ user_id: supabaseSession.user.id, unit });
+        if (error) console.error(error);
+        return;
+      }
       localStorage.setItem(UNIT_KEY, unit);
+    }
+
+    function setAuthStatus() {
+      if (!isSupabaseReady()) {
+        authStatusEl.textContent = "Auth: Disabled (set Supabase keys)";
+        if (storageStatusEl) storageStatusEl.textContent = "Storage: Local browser";
+        return;
+      }
+      if (isAuthed()) {
+        authStatusEl.textContent = `Auth: ${supabaseSession.user.email}`;
+        if (storageStatusEl) storageStatusEl.textContent = "Storage: Supabase";
+      } else {
+        authStatusEl.textContent = "Auth: Signed out";
+        if (storageStatusEl) storageStatusEl.textContent = "Storage: Local browser";
+      }
+    }
+
+    async function initSupabase() {
+      if (!isSupabaseReady()) {
+        setAuthStatus();
+        return;
+      }
+      const { data } = await supabaseClient.auth.getSession();
+      supabaseSession = data.session;
+      setAuthStatus();
+      supabaseClient.auth.onAuthStateChange((_event, session) => {
+        supabaseSession = session;
+        setAuthStatus();
+        refreshFromAuth();
+      });
+    }
+
+    async function refreshFromAuth() {
+      defaultUnitEl.value = await loadUnit();
+      const existingGoal = await loadGoal();
+      syncGoalInputs(existingGoal);
+      updateGoalDays();
+      renderSafe();
+    }
+
+    async function signIn() {
+      if (!isSupabaseReady()) {
+        alert("Set SUPABASE_URL and SUPABASE_ANON_KEY in the code first.");
+        return;
+      }
+      const email = loginEmailEl.value.trim();
+      const password = loginPassEl.value;
+      const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      if (error) {
+        alert(error.message);
+        return;
+      }
+      switchPage("entry");
+    }
+
+    async function signUp() {
+      if (!isSupabaseReady()) {
+        alert("Set SUPABASE_URL and SUPABASE_ANON_KEY in the code first.");
+        return;
+      }
+      const email = loginEmailEl.value.trim();
+      const password = loginPassEl.value;
+      const { data, error } = await supabaseClient.auth.signUp({ email, password });
+      if (error) {
+        alert(error.message);
+        return;
+      }
+      if (!data.session) {
+        alert("Check your email to confirm your account.");
+      }
+      switchPage("entry");
+    }
+
+    async function signOut() {
+      if (!isSupabaseReady()) return;
+      await supabaseClient.auth.signOut();
+      switchPage("login");
     }
 
     function sortEntries(entries) {
@@ -790,8 +993,7 @@
       return Math.round(ms / 86400000);
     }
 
-    function renderTable(entries) {
-      const unit = defaultUnitEl.value;
+    function renderTable(entries, unit) {
       tableBody.innerHTML = "";
       for (const entry of entries) {
         const tr = document.createElement("tr");
@@ -806,14 +1008,12 @@
       }
     }
 
-    function renderStats(entries) {
-      const goal = loadGoal();
+    function renderStats(entries, goal, unit) {
       if (entries.length === 0) {
         statsEl.innerHTML = "<div class=\"stat\"><div class=\"label\">No data yet</div><div class=\"value\">Add an entry</div></div>";
         return;
       }
 
-      const unit = defaultUnitEl.value;
       const sorted = entries.slice().sort((a, b) => a.date.localeCompare(b.date));
       const first = sorted[0];
       const latest = sorted[sorted.length - 1];
@@ -883,7 +1083,7 @@
       return avg;
     }
 
-    function drawChart(entries) {
+    function drawChart(entries, unit) {
       const rect = chart.getBoundingClientRect();
       const width = rect.width;
       const height = rect.height;
@@ -896,7 +1096,6 @@
         return;
       }
 
-      const unit = defaultUnitEl.value;
       const sorted = entries.slice().sort((a, b) => a.date.localeCompare(b.date));
 
       const points = sorted.map(e => {
@@ -981,11 +1180,17 @@
       ctx.fillText(`${maxVal.toFixed(1)} ${unit}`, padding, padding - 10);
     }
 
-    function render() {
-      const entries = sortEntries(loadEntries());
-      renderTable(entries);
-      renderStats(entries);
-      drawChart(entries);
+    async function render() {
+      const unit = defaultUnitEl.value || "lb";
+      const entries = sortEntries(await loadEntries());
+      const goal = await loadGoal();
+      renderTable(entries, unit);
+      renderStats(entries, goal, unit);
+      drawChart(entries, unit);
+    }
+
+    function renderSafe() {
+      render().catch(err => console.error(err));
     }
 
     function clearForm() {
@@ -996,7 +1201,7 @@
       deleteBtn.style.display = "none";
     }
 
-    function addEntry() {
+    async function addEntry() {
       const date = dateEl.value || todayISO();
       const weight = parseFloat(weightEl.value);
       if (!date || Number.isNaN(weight)) {
@@ -1004,7 +1209,7 @@
         return;
       }
 
-      const entries = loadEntries();
+      const entries = await loadEntries();
       const existingByDate = entries.find(e => e.date === date);
       if (editingId) {
         const current = entries.find(e => e.id === editingId);
@@ -1020,16 +1225,25 @@
               target.weight = weight;
               target.notes = notesEl.value.trim();
             }
-            saveEntries(filtered);
-            render();
+            if (isAuthed()) {
+              await deleteEntryRemote(existingByDate.id);
+              await saveEntryRemote(target);
+            } else {
+              saveEntriesLocal(filtered);
+            }
+            renderSafe();
             clearForm();
             return;
           }
           current.date = date;
           current.weight = weight;
           current.notes = notesEl.value.trim();
-          saveEntries(entries);
-          render();
+          if (isAuthed()) {
+            await saveEntryRemote(current);
+          } else {
+            saveEntriesLocal(entries);
+          }
+          renderSafe();
           clearForm();
           return;
         }
@@ -1048,17 +1262,22 @@
         });
       }
 
-      saveEntries(entries);
-      render();
+      if (isAuthed()) {
+        const target = existingByDate || entries[entries.length - 1];
+        await saveEntryRemote(target);
+      } else {
+        saveEntriesLocal(entries);
+      }
+      renderSafe();
       clearForm();
     }
 
-    function handleTableClick(e) {
+    async function handleTableClick(e) {
       const button = e.target.closest("button");
       if (!button) return;
       const id = button.getAttribute("data-id");
       const action = button.getAttribute("data-action");
-      const entries = loadEntries();
+      const entries = await loadEntries();
       const entry = entries.find(x => x.id === id);
       if (!entry) return;
 
@@ -1071,15 +1290,18 @@
         deleteBtn.style.display = "inline-block";
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
-
     }
 
-    function deleteEntry() {
+    async function deleteEntry() {
       if (!editingId) return;
       if (!confirm("Delete this entry?")) return;
-      const entries = loadEntries().filter(e => e.id !== editingId);
-      saveEntries(entries);
-      render();
+      if (isAuthed()) {
+        await deleteEntryRemote(editingId);
+      } else {
+        const entries = (await loadEntries()).filter(e => e.id !== editingId);
+        saveEntriesLocal(entries);
+      }
+      renderSafe();
       clearForm();
     }
 
@@ -1101,7 +1323,7 @@
       updateGoalDays();
     }
 
-    function saveGoalFromInputs() {
+    async function saveGoalFromInputs() {
       const weight = parseFloat(goalWeightEl.value);
       const date = goalDateEl.value;
       if (Number.isNaN(weight) || !date) {
@@ -1109,14 +1331,14 @@
         return;
       }
       const goal = { weight, date };
-      saveGoal(goal);
-      render();
+      await saveGoal(goal);
+      renderSafe();
     }
 
-    function clearGoal() {
-      saveGoal(null);
+    async function clearGoal() {
+      await saveGoal(null);
       syncGoalInputs(null);
-      render();
+      renderSafe();
     }
 
     function updateGoalDateFromWeeks() {
@@ -1153,10 +1375,10 @@
       goalDaysEl.textContent = `${days} days`;
     }
 
-    function handleUnitChange() {
+    async function handleUnitChange() {
       const unit = defaultUnitEl.value;
-      saveUnit(unit);
-      render();
+      await saveUnit(unit);
+      renderSafe();
     }
 
     function openSettings() {
@@ -1177,13 +1399,13 @@
       shell.classList.toggle("entry-mode", page === "entry");
       if (page === "chart") {
         resizeCanvas();
-        drawChart(sortEntries(loadEntries()));
+        renderSafe();
       }
     }
 
     window.addEventListener("resize", () => {
       resizeCanvas();
-      render();
+      renderSafe();
     });
 
     document.getElementById("saveBtn").addEventListener("click", addEntry);
@@ -1213,17 +1435,23 @@
       });
     });
 
-    document.getElementById("continueBtn").addEventListener("click", () => switchPage("entry"));
+    loginBtn.addEventListener("click", signIn);
+    signupBtn.addEventListener("click", signUp);
+    signOutBtn.addEventListener("click", signOut);
+    continueBtn.addEventListener("click", () => switchPage("entry"));
 
-    dateEl.value = todayISO();
-    defaultUnitEl.value = loadUnit();
+    async function initApp() {
+      dateEl.value = todayISO();
+      await initSupabase();
+      defaultUnitEl.value = await loadUnit();
+      const existingGoal = await loadGoal();
+      syncGoalInputs(existingGoal);
+      updateGoalDays();
+      resizeCanvas();
+      renderSafe();
+    }
 
-    const existingGoal = loadGoal();
-    syncGoalInputs(existingGoal);
-    updateGoalDays();
-
-    resizeCanvas();
-    render();
+    initApp().catch(err => console.error(err));
   </script>
 </body>
 </html>

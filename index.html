@@ -1168,6 +1168,7 @@
         chart_step: chartStepEl.value ? Number(chartStepEl.value) : null
       });
       showAuthMessage("Settings saved.", false);
+      await refreshFromAuth();
       resizeCanvas();
       renderSafe();
       closeSettings();
@@ -1578,10 +1579,10 @@
       renderSafe();
     }
 
-    function openSettings() {
+    async function openSettings() {
       settingsBackdrop.classList.add("open");
       settingsBackdrop.setAttribute("aria-hidden", "false");
-      refreshFromAuth();
+      await refreshFromAuth();
     }
 
     function closeSettings() {

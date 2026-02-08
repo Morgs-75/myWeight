@@ -582,6 +582,10 @@
                 <label for="loginPass">Password</label>
                 <input id="loginPass" type="password" placeholder="••••••••" />
               </div>
+              <div class="col-12" style="display:flex; align-items:center; gap:8px;">
+                <input id="rememberMe" type="checkbox" style="width:auto;" />
+                <label for="rememberMe" style="margin:0; text-transform:none; letter-spacing:0;">Remember me</label>
+              </div>
               <div class="col-12" style="display:flex; gap:10px; flex-wrap:wrap;">
                 <button id="loginBtn">Sign In</button>
                 <button class="secondary" id="signupBtn">Create Account</button>
@@ -757,6 +761,7 @@
     const storageStatusEl = document.getElementById("storageStatus");
     const loginEmailEl = document.getElementById("loginEmail");
     const loginPassEl = document.getElementById("loginPass");
+    const rememberMeEl = document.getElementById("rememberMe");
     const loginBtn = document.getElementById("loginBtn");
     const signupBtn = document.getElementById("signupBtn");
     const magicLinkBtn = document.getElementById("magicLinkBtn");
@@ -1038,6 +1043,11 @@
       if (error) {
         showAuthMessage(error.message, true);
         return;
+      }
+      if (rememberMeEl && rememberMeEl.checked) {
+        localStorage.setItem("remember_email", email);
+      } else {
+        localStorage.removeItem("remember_email");
       }
       showAuthMessage("Signed in.", false);
       switchPage("entry");
@@ -1593,6 +1603,11 @@
 
     async function initApp() {
       dateEl.value = todayISO();
+      const rememberedEmail = localStorage.getItem("remember_email");
+      if (rememberedEmail) {
+        loginEmailEl.value = rememberedEmail;
+        rememberMeEl.checked = true;
+      }
       await initSupabase();
       defaultUnitEl.value = await loadUnit();
       const existingGoal = await loadGoal();

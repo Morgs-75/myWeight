@@ -29,6 +29,11 @@ create table if not exists public.user_settings (
 );
 
 
+-- Add columns that may be missing from older installations
+alter table public.user_settings add column if not exists chart_min numeric;
+alter table public.user_settings add column if not exists chart_max numeric;
+alter table public.user_settings add column if not exists chart_step numeric;
+
 alter table public.weight_entries enable row level security;
 alter table public.user_settings enable row level security;
 

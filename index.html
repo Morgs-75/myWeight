@@ -1015,7 +1015,6 @@
       setAuthStatus();
       if (supabaseSession) {
         refreshFromAuth();
-        switchPage("entry");
       }
       supabaseClient.auth.onAuthStateChange((event, session) => {
         supabaseSession = session;

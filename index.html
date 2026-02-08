@@ -289,6 +289,8 @@
     .modal {
       width: 100%;
       max-width: 340px;
+      max-height: 90vh;
+      overflow-y: auto;
       background: #fff;
       border-radius: 18px;
       border: 1px solid var(--line);
@@ -587,10 +589,6 @@
                 <label for="useMagicLink" style="margin:0; text-transform:none; letter-spacing:0;">Use magic link instead of password</label>
               </div>
               <div class="col-12" style="display:flex; align-items:center; gap:8px;">
-                <input id="rememberMe" type="checkbox" style="width:auto;" />
-                <label for="rememberMe" style="margin:0; text-transform:none; letter-spacing:0;">Remember me</label>
-              </div>
-              <div class="col-12" style="display:flex; align-items:center; gap:8px;">
                 <input id="keepSignedIn" type="checkbox" style="width:auto;" />
                 <label for="keepSignedIn" style="margin:0; text-transform:none; letter-spacing:0;">Keep me signed in</label>
               </div>
@@ -743,6 +741,7 @@
       <input id="chartMax" type="number" step="0.1" min="0" placeholder="e.g., 105.0" />
       <label for="chartStep" style="margin-top:10px;">Y Axis Interval (kg)</label>
       <input id="chartStep" type="number" step="0.1" min="0.1" placeholder="e.g., 0.25" />
+      <div id="settingsMessage" class="note" style="min-height:18px;"></div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
         <button id="saveSettingsBtn">Save Settings</button>
       </div>
@@ -771,7 +770,6 @@
     const storageStatusEl = document.getElementById("storageStatus");
     const loginEmailEl = document.getElementById("loginEmail");
     const loginPassEl = document.getElementById("loginPass");
-    const rememberMeEl = document.getElementById("rememberMe");
     const useMagicLinkEl = document.getElementById("useMagicLink");
     const keepSignedInEl = document.getElementById("keepSignedIn");
     const loginBtn = document.getElementById("loginBtn");
@@ -797,6 +795,7 @@
     const goalDateEl = document.getElementById("goalDate");
     const goalWeeksEl = document.getElementById("goalWeeks");
     const goalDaysEl = document.getElementById("goalDays");
+    const settingsMessageEl = document.getElementById("settingsMessage");
 
     const navButtons = Array.from(document.querySelectorAll(".bottom-nav button"));
     const pages = Array.from(document.querySelectorAll(".page"));
@@ -899,16 +898,6 @@
       if (error) console.error(error);
     }
 
-    function loadGoalLocal() {
-      const raw = localStorage.getItem(GOAL_KEY);
-      if (!raw) return null;
-      try {
-        return JSON.parse(raw);
-      } catch {
-        return null;
-      }
-    }
-
     function loadSettingsLocal() {
       return {
         unit: localStorage.getItem(UNIT_KEY) || "kg",
@@ -952,6 +941,20 @@
     }
 
     async function saveSettings(settings) {
+      // Always save to localStorage (primary for offline, backup for authed)
+      localStorage.setItem(UNIT_KEY, settings.unit || "kg");
+      localStorage.setItem(GOAL_KEY, JSON.stringify({
+        weight: settings.goal_weight || "",
+        date: settings.goal_date || ""
+      }));
+      localStorage.setItem("profile_name", settings.full_name || "");
+      localStorage.setItem("profile_tz", settings.timezone || "");
+      localStorage.setItem("profile_height", settings.height_cm || "");
+      localStorage.setItem("chart_min", settings.chart_min || "");
+      localStorage.setItem("chart_max", settings.chart_max || "");
+      localStorage.setItem("chart_step", settings.chart_step || "");
+
+      // Also sync to Supabase if authenticated
       if (isAuthed()) {
         const { error } = await supabaseClient
           .from("user_settings")
@@ -967,20 +970,11 @@
             chart_max: settings.chart_max || null,
             chart_step: settings.chart_step || null
           });
-        if (error) console.error(error);
-        return;
+        if (error) {
+          console.error(error);
+          throw new Error(error.message);
+        }
       }
-      localStorage.setItem(UNIT_KEY, settings.unit || "kg");
-      localStorage.setItem(GOAL_KEY, JSON.stringify({
-        weight: settings.goal_weight || "",
-        date: settings.goal_date || ""
-      }));
-      localStorage.setItem("profile_name", settings.full_name || "");
-      localStorage.setItem("profile_tz", settings.timezone || "");
-      localStorage.setItem("profile_height", settings.height_cm || "");
-      localStorage.setItem("chart_min", settings.chart_min || "");
-      localStorage.setItem("chart_max", settings.chart_max || "");
-      localStorage.setItem("chart_step", settings.chart_step || "");
     }
 
     function setAuthStatus() {
@@ -1004,6 +998,12 @@
       authMessageEl.style.color = isError ? "#b3261e" : "#2e7d32";
     }
 
+    function showSettingsMessage(message, isError) {
+      if (!settingsMessageEl) return;
+      settingsMessageEl.textContent = message || "";
+      settingsMessageEl.style.color = isError ? "#b3261e" : "#2e7d32";
+    }
+
     async function initSupabase() {
       supabaseClient = createSupabaseClient();
       if (!isSupabaseReady()) {
@@ -1015,11 +1015,17 @@
       setAuthStatus();
       if (supabaseSession) {
         refreshFromAuth();
+        switchPage("entry");
       }
-      supabaseClient.auth.onAuthStateChange((_event, session) => {
+      supabaseClient.auth.onAuthStateChange((event, session) => {
         supabaseSession = session;
         setAuthStatus();
         refreshFromAuth();
+        if (event === "SIGNED_IN") {
+          switchPage("entry");
+        } else if (event === "SIGNED_OUT") {
+          switchPage("login");
+        }
       });
     }
 
@@ -1044,7 +1050,6 @@
       }
       if (keepSignedInEl) {
         setAuthPersist(keepSignedInEl.checked);
-        await initSupabase();
       }
       if (useMagicLinkEl && useMagicLinkEl.checked) {
         await sendMagicLink();
@@ -1065,11 +1070,6 @@
         showAuthMessage(error.message, true);
         return;
       }
-      if (rememberMeEl && rememberMeEl.checked) {
-        localStorage.setItem("remember_email", email);
-      } else {
-        localStorage.removeItem("remember_email");
-      }
       showAuthMessage("Signed in.", false);
       await refreshFromAuth();
       switchPage("entry");
@@ -1082,7 +1082,6 @@
       }
       if (keepSignedInEl) {
         setAuthPersist(keepSignedInEl.checked);
-        await initSupabase();
       }
       const email = loginEmailEl.value.trim();
       const password = loginPassEl.value;
@@ -1105,6 +1104,7 @@
       }
       showAuthMessage("Account created. You can sign in now.", false);
       await refreshFromAuth();
+      switchPage("entry");
     }
 
     async function sendMagicLink() {
@@ -1114,7 +1114,6 @@
       }
       if (keepSignedInEl) {
         setAuthPersist(keepSignedInEl.checked);
-        await initSupabase();
       }
       const email = loginEmailEl.value.trim();
       if (!email) {
@@ -1156,22 +1155,26 @@
       const unit = defaultUnitEl.value || "kg";
       const goalWeight = goalWeightEl.value ? Number(goalWeightEl.value) : null;
       const goalDate = goalDateEl.value || "";
-      await saveSettings({
-        unit,
-        goal_weight: goalWeight,
-        goal_date: goalDate,
-        full_name: profileNameEl.value.trim(),
-        timezone: profileTimezoneEl.value.trim(),
-        height_cm: profileHeightEl.value ? Number(profileHeightEl.value) : null,
-        chart_min: chartMinEl.value ? Number(chartMinEl.value) : null,
-        chart_max: chartMaxEl.value ? Number(chartMaxEl.value) : null,
-        chart_step: chartStepEl.value ? Number(chartStepEl.value) : null
-      });
-      showAuthMessage("Settings saved.", false);
-      await refreshFromAuth();
-      resizeCanvas();
-      renderSafe();
-      closeSettings();
+      try {
+        await saveSettings({
+          unit,
+          goal_weight: goalWeight,
+          goal_date: goalDate,
+          full_name: profileNameEl.value.trim(),
+          timezone: profileTimezoneEl.value.trim(),
+          height_cm: profileHeightEl.value ? Number(profileHeightEl.value) : null,
+          chart_min: chartMinEl.value ? Number(chartMinEl.value) : null,
+          chart_max: chartMaxEl.value ? Number(chartMaxEl.value) : null,
+          chart_step: chartStepEl.value ? Number(chartStepEl.value) : null
+        });
+        showSettingsMessage("Settings saved.", false);
+        await refreshFromAuth();
+        resizeCanvas();
+        renderSafe();
+        setTimeout(closeSettings, 600);
+      } catch (err) {
+        showSettingsMessage("Saved locally. Cloud sync failed: " + err.message, true);
+      }
     }
 
     async function signOut() {
@@ -1503,7 +1506,7 @@
         switchPage("entry");
         dateEl.value = entry.date;
         weightEl.value = entry.weight;
-        notesEl.value = entry.notes;
+        notesEl.value = entry.notes || "";
         editingId = entry.id;
         deleteBtn.style.display = "inline-block";
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1580,6 +1583,7 @@
     }
 
     async function openSettings() {
+      showSettingsMessage("");
       settingsBackdrop.classList.add("open");
       settingsBackdrop.setAttribute("aria-hidden", "false");
       await refreshFromAuth();
@@ -1641,11 +1645,6 @@
 
     async function initApp() {
       dateEl.value = todayISO();
-      const rememberedEmail = localStorage.getItem("remember_email");
-      if (rememberedEmail) {
-        loginEmailEl.value = rememberedEmail;
-        rememberMeEl.checked = true;
-      }
       await initSupabase();
       const settings = await loadSettings();
       defaultUnitEl.value = settings.unit || "kg";
@@ -1656,6 +1655,10 @@
       setTimeout(() => {
         if (splashEl) splashEl.classList.add("hidden");
       }, 400);
+
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("sw.js").catch(() => {});
+      }
     }
 
     initApp().catch(err => console.error(err));

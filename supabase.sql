@@ -21,12 +21,26 @@ create table if not exists public.user_settings (
   full_name text,
   timezone text,
   height_cm numeric,
+  chart_min numeric,
+  chart_max numeric,
+  chart_step numeric,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  full_name text,
+  timezone text,
+  height_cm numeric,
+  unit text not null default 'kg',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 alter table public.weight_entries enable row level security;
 alter table public.user_settings enable row level security;
+alter table public.profiles enable row level security;
 
 drop policy if exists "Users can access own entries" on public.weight_entries;
 drop policy if exists "Users can access own settings" on public.user_settings;
@@ -42,3 +56,10 @@ create policy "Users can access own settings"
   for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+drop policy if exists "Users can access own profile" on public.profiles;
+create policy "Users can access own profile"
+  on public.profiles
+  for all
+  using (auth.uid() = id)
+  with check (auth.uid() = id);

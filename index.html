@@ -736,6 +736,13 @@
       <label for="goalWeeks" style="margin-top:10px;">Timeframe (weeks)</label>
       <input id="goalWeeks" type="number" min="1" step="1" placeholder="e.g., 12" />
       <div class="note">Days: <span id="goalDays">0 days</span></div>
+      <div style="height:12px;"></div>
+      <label for="chartMin">Chart Min (kg)</label>
+      <input id="chartMin" type="number" step="0.1" min="0" placeholder="e.g., 90.0" />
+      <label for="chartMax" style="margin-top:10px;">Chart Max (kg)</label>
+      <input id="chartMax" type="number" step="0.1" min="0" placeholder="e.g., 105.0" />
+      <label for="chartStep" style="margin-top:10px;">Y Axis Interval (kg)</label>
+      <input id="chartStep" type="number" step="0.1" min="0.1" placeholder="e.g., 0.25" />
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
         <button id="saveSettingsBtn">Save Settings</button>
       </div>
@@ -782,6 +789,9 @@
     const profileTimezoneEl = document.getElementById("profileTimezone");
     const profileHeightEl = document.getElementById("profileHeight");
     const saveSettingsBtn = document.getElementById("saveSettingsBtn");
+    const chartMinEl = document.getElementById("chartMin");
+    const chartMaxEl = document.getElementById("chartMax");
+    const chartStepEl = document.getElementById("chartStep");
 
     const goalWeightEl = document.getElementById("goalWeight");
     const goalDateEl = document.getElementById("goalDate");
@@ -910,7 +920,10 @@
           : "",
         full_name: localStorage.getItem("profile_name") || "",
         timezone: localStorage.getItem("profile_tz") || "",
-        height_cm: localStorage.getItem("profile_height") || ""
+        height_cm: localStorage.getItem("profile_height") || "",
+        chart_min: localStorage.getItem("chart_min") || "",
+        chart_max: localStorage.getItem("chart_max") || "",
+        chart_step: localStorage.getItem("chart_step") || ""
       };
     }
 
@@ -918,7 +931,7 @@
       if (isAuthed()) {
         const { data, error } = await supabaseClient
           .from("user_settings")
-          .select("unit,goal_weight,goal_date,full_name,timezone,height_cm")
+          .select("unit,goal_weight,goal_date,full_name,timezone,height_cm,chart_min,chart_max,chart_step")
           .eq("user_id", supabaseSession.user.id)
           .maybeSingle();
         if (error) {
@@ -932,7 +945,10 @@
         const merged = {
           ...data,
           goal_weight: data.goal_weight !== null ? Number(data.goal_weight) : null,
-          height_cm: data.height_cm !== null ? Number(data.height_cm) : null
+          height_cm: data.height_cm !== null ? Number(data.height_cm) : null,
+          chart_min: data.chart_min !== null ? Number(data.chart_min) : "",
+          chart_max: data.chart_max !== null ? Number(data.chart_max) : "",
+          chart_step: data.chart_step !== null ? Number(data.chart_step) : ""
         };
         if (!merged.full_name && !merged.timezone && merged.height_cm === null) {
           const fallback = await loadSettingsFromProfiles();
@@ -970,7 +986,10 @@
             goal_date: settings.goal_date || null,
             full_name: settings.full_name || null,
             timezone: settings.timezone || null,
-            height_cm: settings.height_cm || null
+            height_cm: settings.height_cm || null,
+            chart_min: settings.chart_min || null,
+            chart_max: settings.chart_max || null,
+            chart_step: settings.chart_step || null
           });
         if (error) console.error(error);
         const { error: profileError } = await supabaseClient
@@ -993,6 +1012,9 @@
       localStorage.setItem("profile_name", settings.full_name || "");
       localStorage.setItem("profile_tz", settings.timezone || "");
       localStorage.setItem("profile_height", settings.height_cm || "");
+      localStorage.setItem("chart_min", settings.chart_min || "");
+      localStorage.setItem("chart_max", settings.chart_max || "");
+      localStorage.setItem("chart_step", settings.chart_step || "");
     }
 
     function setAuthStatus() {
@@ -1040,6 +1062,9 @@
       profileNameEl.value = settings.full_name || "";
       profileTimezoneEl.value = settings.timezone || "";
       profileHeightEl.value = settings.height_cm ?? "";
+      chartMinEl.value = settings.chart_min ?? "";
+      chartMaxEl.value = settings.chart_max ?? "";
+      chartStepEl.value = settings.chart_step ?? "";
       renderSafe();
     }
 
@@ -1166,7 +1191,10 @@
         goal_date: goalDate,
         full_name: profileNameEl.value.trim(),
         timezone: profileTimezoneEl.value.trim(),
-        height_cm: profileHeightEl.value ? Number(profileHeightEl.value) : null
+        height_cm: profileHeightEl.value ? Number(profileHeightEl.value) : null,
+        chart_min: chartMinEl.value ? Number(chartMinEl.value) : null,
+        chart_max: chartMaxEl.value ? Number(chartMaxEl.value) : null,
+        chart_step: chartStepEl.value ? Number(chartStepEl.value) : null
       });
       showAuthMessage("Settings saved.", false);
       renderSafe();
@@ -1296,7 +1324,7 @@
       return avg;
     }
 
-    function drawChart(entries, unit) {
+    function drawChart(entries, unit, settings) {
       const rect = chart.getBoundingClientRect();
       const width = rect.width;
       const height = rect.height;
@@ -1323,8 +1351,17 @@
 
       const values = points.map(p => p.value);
       const avgValues = computeAvgSeries(values);
-      const minVal = Math.min(...values, ...avgValues);
-      const maxVal = Math.max(...values, ...avgValues);
+      let minVal = Math.min(...values, ...avgValues);
+      let maxVal = Math.max(...values, ...avgValues);
+      if (settings?.chart_min !== "" && settings?.chart_min !== null) {
+        minVal = Number(settings.chart_min);
+      }
+      if (settings?.chart_max !== "" && settings?.chart_max !== null) {
+        maxVal = Number(settings.chart_max);
+      }
+      if (maxVal <= minVal) {
+        maxVal = minVal + 1;
+      }
       const valSpan = maxVal - minVal || 1;
 
       function xForIndex(i) {
@@ -1338,10 +1375,20 @@
       ctx.strokeStyle = "#e7d7c7";
       ctx.lineWidth = 1;
       ctx.beginPath();
-      for (let i = 0; i <= 4; i++) {
-        const y = padding + i * ((height - padding * 2) / 4);
-        ctx.moveTo(padding, y);
-        ctx.lineTo(width - padding, y);
+      const step = settings?.chart_step ? Number(settings.chart_step) : null;
+      if (step && step > 0) {
+        const firstTick = Math.ceil(minVal / step) * step;
+        for (let v = firstTick; v <= maxVal + 0.0001; v += step) {
+          const y = yFor(v);
+          ctx.moveTo(padding, y);
+          ctx.lineTo(width - padding, y);
+        }
+      } else {
+        for (let i = 0; i <= 4; i++) {
+          const y = padding + i * ((height - padding * 2) / 4);
+          ctx.moveTo(padding, y);
+          ctx.lineTo(width - padding, y);
+        }
       }
       ctx.stroke();
 
@@ -1353,9 +1400,11 @@
       points.forEach((p, i) => {
         const x = xForIndex(i);
         const y = yFor(p.value);
-        const h = height - padding - y;
+        const rawH = height - padding - y;
+        const h = Math.max(2, rawH);
+        const yTop = rawH < 2 ? y - (2 - rawH) : y;
         ctx.fillStyle = barGradient;
-        ctx.fillRect(x - barWidth / 2, y, barWidth, h);
+        ctx.fillRect(x - barWidth / 2, yTop, barWidth, h);
       });
 
       ctx.strokeStyle = "#7b4dff";
@@ -1382,7 +1431,7 @@
       const goal = settings.goal_weight ? { weight: Number(settings.goal_weight), date: settings.goal_date || "" } : null;
       renderTable(entries, unit);
       renderStats(entries, goal, unit);
-      drawChart(entries, unit);
+      drawChart(entries, unit, settings);
     }
 
     function renderSafe() {

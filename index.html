@@ -1373,7 +1373,7 @@
         return;
       }
 
-      const padLeft = 48;
+      const padLeft = 56;
       const padRight = 16;
       const padTop = 20;
       const padBottom = 44;
@@ -1398,8 +1398,25 @@
       function xForIndex(i) { return padLeft + i * xStep; }
       function yFor(value) { return padTop + ((maxVal - value) / valSpan) * (height - padTop - padBottom); }
 
-      // Y axis grid lines — 0.25 faint, 0.5 medium, 1.0 darker
-      const gridStep = 0.25;
+      // Dynamic grid and label intervals based on available space
+      const chartHeight = height - padTop - padBottom;
+      const minGridPx = 8;
+      const maxGridLines = Math.floor(chartHeight / minGridPx);
+      let gridStep = 0.25;
+      if (valSpan / gridStep > maxGridLines) gridStep = 0.5;
+      if (valSpan / gridStep > maxGridLines) gridStep = 1;
+      if (valSpan / gridStep > maxGridLines) gridStep = 2;
+      if (valSpan / gridStep > maxGridLines) gridStep = Math.ceil(valSpan / maxGridLines);
+
+      const minLabelPx = 20;
+      const maxLabels = Math.floor(chartHeight / minLabelPx);
+      let labelStep = 0.5;
+      if (valSpan / labelStep > maxLabels) labelStep = 1;
+      if (valSpan / labelStep > maxLabels) labelStep = 2;
+      if (valSpan / labelStep > maxLabels) labelStep = 5;
+      if (valSpan / labelStep > maxLabels) labelStep = 10;
+      if (valSpan / labelStep > maxLabels) labelStep = Math.ceil(valSpan / maxLabels);
+
       const firstTick = Math.ceil(minVal / gridStep) * gridStep;
       ctx.font = "10px Space Grotesk, Fira Sans, sans-serif";
       ctx.textAlign = "right";
@@ -1421,10 +1438,11 @@
         ctx.moveTo(padLeft, y);
         ctx.lineTo(width - padRight, y);
         ctx.stroke();
-        // Label at 0.5 intervals
-        if (isHalf || isWhole) {
+        // Label at dynamic intervals
+        const onLabel = Math.abs(v / labelStep - Math.round(v / labelStep)) < 0.01;
+        if (onLabel) {
           ctx.fillStyle = "#8a7f70";
-          ctx.fillText(v.toFixed(1), padLeft - 6, y + 3);
+          ctx.fillText(v.toFixed(1), padLeft - 8, y + 3);
         }
       }
       ctx.textAlign = "start";

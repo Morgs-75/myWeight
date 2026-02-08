@@ -1505,8 +1505,8 @@
       ctx.fillStyle = "#8a7f70";
       ctx.font = "10px Space Grotesk, Fira Sans, sans-serif";
       ctx.textAlign = "center";
-      const maxLabels = Math.floor((width - padLeft - padRight) / 52);
-      const labelEvery = Math.max(1, Math.ceil(points.length / maxLabels));
+      const maxXLabels = Math.floor((width - padLeft - padRight) / 52);
+      const labelEvery = Math.max(1, Math.ceil(points.length / maxXLabels));
       points.forEach((p, i) => {
         if (i % labelEvery !== 0 && i !== points.length - 1) return;
         const x = xForIndex(i);

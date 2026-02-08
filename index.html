@@ -947,14 +947,15 @@
       if (!isAuthed()) return null;
       const { data, error } = await supabaseClient
         .from("profiles")
-        .select("full_name,timezone,height_cm")
+        .select("full_name,timezone,height_cm,unit")
         .eq("id", supabaseSession.user.id)
         .maybeSingle();
       if (error || !data) return null;
       return {
         full_name: data.full_name || "",
         timezone: data.timezone || "",
-        height_cm: data.height_cm !== null ? Number(data.height_cm) : ""
+        height_cm: data.height_cm !== null ? Number(data.height_cm) : "",
+        unit: data.unit || "kg"
       };
     }
 
@@ -972,6 +973,16 @@
             height_cm: settings.height_cm || null
           });
         if (error) console.error(error);
+        const { error: profileError } = await supabaseClient
+          .from("profiles")
+          .upsert({
+            id: supabaseSession.user.id,
+            full_name: settings.full_name || null,
+            timezone: settings.timezone || null,
+            height_cm: settings.height_cm || null,
+            unit: settings.unit || "kg"
+          });
+        if (profileError) console.error(profileError);
         return;
       }
       localStorage.setItem(UNIT_KEY, settings.unit || "kg");
@@ -1037,6 +1048,10 @@
         showAuthMessage("Set Supabase keys first.", true);
         return;
       }
+      if (keepSignedInEl) {
+        setAuthPersist(keepSignedInEl.checked);
+        await initSupabase();
+      }
       if (useMagicLinkEl && useMagicLinkEl.checked) {
         await sendMagicLink();
         return;
@@ -1070,6 +1085,10 @@
         showAuthMessage("Set Supabase keys first.", true);
         return;
       }
+      if (keepSignedInEl) {
+        setAuthPersist(keepSignedInEl.checked);
+        await initSupabase();
+      }
       const email = loginEmailEl.value.trim();
       const password = loginPassEl.value;
       if (!email) {
@@ -1096,6 +1115,10 @@
       if (!isSupabaseReady()) {
         showAuthMessage("Set Supabase keys first.", true);
         return;
+      }
+      if (keepSignedInEl) {
+        setAuthPersist(keepSignedInEl.checked);
+        await initSupabase();
       }
       const email = loginEmailEl.value.trim();
       if (!email) {
@@ -1279,10 +1302,10 @@
       const height = rect.height;
       ctx.clearRect(0, 0, width, height);
 
-      if (entries.length < 2) {
+      if (entries.length < 1) {
         ctx.fillStyle = "#7a6d5f";
         ctx.font = "14px Space Grotesk, Fira Sans, sans-serif";
-        ctx.fillText("Add at least two entries to see the trend.", 16, 28);
+        ctx.fillText("Add an entry to see the chart.", 16, 28);
         return;
       }
 
@@ -1293,7 +1316,7 @@
         return { date, value: e.weight };
       }).filter(p => p.date);
 
-      if (points.length < 2) return;
+      if (points.length < 1) return;
 
       const minDate = points[0].date;
       const maxDate = points[points.length - 1].date;
@@ -1325,7 +1348,7 @@
       }
       ctx.stroke();
 
-      const barWidth = Math.max(6, Math.min(18, (width - padding * 2) / points.length * 0.6));
+      const barWidth = Math.max(8, Math.min(22, (width - padding * 2) / Math.max(1, points.length) * 0.6));
       const barGradient = ctx.createLinearGradient(0, padding, 0, height - padding);
       barGradient.addColorStop(0, "rgba(45,123,255,0.85)");
       barGradient.addColorStop(1, "rgba(255,94,168,0.55)");

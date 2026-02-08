@@ -572,6 +572,9 @@
                 <h2 style="margin:0 0 10px 0; font-size:20px;">Login</h2>
               </div>
               <div class="col-12">
+                <div id="authMessage" class="note" style="min-height:18px;"></div>
+              </div>
+              <div class="col-12">
                 <label for="loginEmail">Email</label>
                 <input id="loginEmail" type="email" placeholder="you@example.com" />
               </div>
@@ -758,6 +761,7 @@
     const signupBtn = document.getElementById("signupBtn");
     const magicLinkBtn = document.getElementById("magicLinkBtn");
     const resetPassBtn = document.getElementById("resetPassBtn");
+    const authMessageEl = document.getElementById("authMessage");
 
     const defaultUnitEl = document.getElementById("defaultUnit");
     const closeSettingsBtn = document.getElementById("closeSettings");
@@ -976,6 +980,12 @@
       }
     }
 
+    function showAuthMessage(message, isError) {
+      if (!authMessageEl) return;
+      authMessageEl.textContent = message || "";
+      authMessageEl.style.color = isError ? "#b3261e" : "#2e7d32";
+    }
+
     async function initSupabase() {
       if (!isSupabaseReady()) {
         setAuthStatus();
@@ -1011,62 +1021,63 @@
 
     async function signIn() {
       if (!isSupabaseReady()) {
-        alert("Set SUPABASE_URL and SUPABASE_ANON_KEY in the code first.");
+        showAuthMessage("Set Supabase keys first.", true);
         return;
       }
       const email = loginEmailEl.value.trim();
       const password = loginPassEl.value;
       if (!email) {
-        alert("Please enter your email.");
+        showAuthMessage("Please enter your email.", true);
         return;
       }
       if (!password) {
-        alert("Please enter your password.");
+        showAuthMessage("Please enter your password.", true);
         return;
       }
       const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
       if (error) {
-        alert(error.message);
+        showAuthMessage(error.message, true);
         return;
       }
+      showAuthMessage("Signed in.", false);
       switchPage("entry");
     }
 
     async function signUp() {
       if (!isSupabaseReady()) {
-        alert("Set SUPABASE_URL and SUPABASE_ANON_KEY in the code first.");
+        showAuthMessage("Set Supabase keys first.", true);
         return;
       }
       const email = loginEmailEl.value.trim();
       const password = loginPassEl.value;
       if (!email) {
-        alert("Please enter your email.");
+        showAuthMessage("Please enter your email.", true);
         return;
       }
       if (!password || password.length < 6) {
-        alert("Please enter a password (at least 6 characters).");
+        showAuthMessage("Please enter a password (at least 6 characters).", true);
         return;
       }
       const { data, error } = await supabaseClient.auth.signUp({ email, password });
       if (error) {
-        alert(error.message);
+        showAuthMessage(error.message, true);
         return;
       }
       if (!data.session) {
-        alert("Account created. Check your email to confirm, then sign in.");
+        showAuthMessage("Account created. Please confirm your email, then sign in.", false);
         return;
       }
-      alert("Account created. You can sign in now.");
+      showAuthMessage("Account created. You can sign in now.", false);
     }
 
     async function sendMagicLink() {
       if (!isSupabaseReady()) {
-        alert("Set SUPABASE_URL and SUPABASE_ANON_KEY in the code first.");
+        showAuthMessage("Set Supabase keys first.", true);
         return;
       }
       const email = loginEmailEl.value.trim();
       if (!email) {
-        alert("Please enter your email.");
+        showAuthMessage("Please enter your email.", true);
         return;
       }
       const { error } = await supabaseClient.auth.signInWithOtp({
@@ -1074,35 +1085,35 @@
         options: { emailRedirectTo: window.location.href }
       });
       if (error) {
-        alert(error.message);
+        showAuthMessage(error.message, true);
         return;
       }
-      alert("Magic link sent. Check your email.");
+      showAuthMessage("Magic link sent. Check your email.", false);
     }
 
     async function resetPassword() {
       if (!isSupabaseReady()) {
-        alert("Set SUPABASE_URL and SUPABASE_ANON_KEY in the code first.");
+        showAuthMessage("Set Supabase keys first.", true);
         return;
       }
       const email = loginEmailEl.value.trim();
       if (!email) {
-        alert("Please enter your email.");
+        showAuthMessage("Please enter your email.", true);
         return;
       }
       const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
         redirectTo: window.location.href
       });
       if (error) {
-        alert(error.message);
+        showAuthMessage(error.message, true);
         return;
       }
-      alert("Password reset email sent.");
+      showAuthMessage("Password reset email sent.", false);
     }
 
     async function saveProfileFromInputs() {
       if (!isAuthed()) {
-        alert("Sign in to save your profile.");
+        showAuthMessage("Sign in to save your profile.", true);
         return;
       }
       await saveProfile({
@@ -1110,7 +1121,7 @@
         timezone: profileTimezoneEl.value.trim(),
         height_cm: profileHeightEl.value ? Number(profileHeightEl.value) : null
       });
-      alert("Profile saved.");
+      showAuthMessage("Profile saved.", false);
     }
 
     async function signOut() {

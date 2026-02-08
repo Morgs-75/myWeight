@@ -32,6 +32,21 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
+  // Network-first for navigation (HTML) so deploys are seen immediately
+  if (e.request.mode === "navigate") {
+    e.respondWith(
+      fetch(e.request).then((response) => {
+        if (response && response.status === 200) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
+        }
+        return response;
+      }).catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // Stale-while-revalidate for other assets
   e.respondWith(
     caches.match(e.request).then((cached) => {
       const fetched = fetch(e.request).then((response) => {

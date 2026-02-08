@@ -1047,6 +1047,9 @@
       const { data } = await supabaseClient.auth.getSession();
       supabaseSession = data.session;
       setAuthStatus();
+      if (supabaseSession) {
+        refreshFromAuth();
+      }
       supabaseClient.auth.onAuthStateChange((_event, session) => {
         supabaseSession = session;
         setAuthStatus();
@@ -1102,6 +1105,7 @@
         localStorage.removeItem("remember_email");
       }
       showAuthMessage("Signed in.", false);
+      await refreshFromAuth();
       switchPage("entry");
     }
 
@@ -1134,6 +1138,7 @@
         return;
       }
       showAuthMessage("Account created. You can sign in now.", false);
+      await refreshFromAuth();
     }
 
     async function sendMagicLink() {
@@ -1610,6 +1615,7 @@
     function openSettings() {
       settingsBackdrop.classList.add("open");
       settingsBackdrop.setAttribute("aria-hidden", "false");
+      refreshFromAuth();
     }
 
     function closeSettings() {

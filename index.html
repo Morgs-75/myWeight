@@ -437,6 +437,15 @@
       visibility: hidden;
     }
 
+    @keyframes splash-fade {
+      0%, 80% { opacity: 1; visibility: visible; }
+      100% { opacity: 0; visibility: hidden; }
+    }
+
+    .splash {
+      animation: splash-fade 3.5s ease forwards;
+    }
+
     .splash-card {
       padding: 24px 28px;
       border-radius: 22px;

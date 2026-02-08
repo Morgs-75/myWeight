@@ -856,7 +856,10 @@
           console.error(error);
           return [];
         }
-        return data || [];
+        return (data || []).map(row => ({
+          ...row,
+          weight: Number(row.weight)
+        }));
       }
       return loadEntriesLocal();
     }
@@ -922,9 +925,37 @@
           console.error(error);
           return loadSettingsLocal();
         }
-        return data || loadSettingsLocal();
+        if (!data) {
+          const fallback = await loadSettingsFromProfiles();
+          return fallback || loadSettingsLocal();
+        }
+        const merged = {
+          ...data,
+          goal_weight: data.goal_weight !== null ? Number(data.goal_weight) : null,
+          height_cm: data.height_cm !== null ? Number(data.height_cm) : null
+        };
+        if (!merged.full_name && !merged.timezone && merged.height_cm === null) {
+          const fallback = await loadSettingsFromProfiles();
+          return fallback ? { ...merged, ...fallback } : merged;
+        }
+        return merged;
       }
       return loadSettingsLocal();
+    }
+
+    async function loadSettingsFromProfiles() {
+      if (!isAuthed()) return null;
+      const { data, error } = await supabaseClient
+        .from("profiles")
+        .select("full_name,timezone,height_cm")
+        .eq("id", supabaseSession.user.id)
+        .maybeSingle();
+      if (error || !data) return null;
+      return {
+        full_name: data.full_name || "",
+        timezone: data.timezone || "",
+        height_cm: data.height_cm !== null ? Number(data.height_cm) : ""
+      };
     }
 
     async function saveSettings(settings) {
@@ -1116,6 +1147,7 @@
       });
       showAuthMessage("Settings saved.", false);
       renderSafe();
+      closeSettings();
     }
 
     async function signOut() {

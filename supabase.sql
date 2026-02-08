@@ -28,6 +28,9 @@ create table if not exists public.user_settings (
 alter table public.weight_entries enable row level security;
 alter table public.user_settings enable row level security;
 
+drop policy if exists "Users can access own entries" on public.weight_entries;
+drop policy if exists "Users can access own settings" on public.user_settings;
+
 create policy "Users can access own entries"
   on public.weight_entries
   for all

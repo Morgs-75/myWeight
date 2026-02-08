@@ -1790,16 +1790,17 @@
       updateGoalDays();
       resizeCanvas();
       renderSafe();
-      setTimeout(() => {
-        if (splashEl) splashEl.classList.add("hidden");
-      }, 400);
 
       if ("serviceWorker" in navigator) {
         navigator.serviceWorker.register("sw.js").catch(() => {});
       }
     }
 
-    initApp().catch(err => console.error(err));
+    initApp()
+      .catch(err => console.error(err))
+      .finally(() => {
+        setTimeout(() => { if (splashEl) splashEl.classList.add("hidden"); }, 400);
+      });
   </script>
 </body>
 </html>

@@ -583,7 +583,7 @@
                 <h2 style="margin:0 0 10px 0; font-size:20px;">Login</h2>
               </div>
               <div class="col-12">
-                <div id="authMessage" class="note" style="min-height:18px;"></div>
+                <div id="authMessage" class="note" style="min-height:18px; font-size:14px; font-weight:600;"></div>
               </div>
               <div class="col-12">
                 <label for="loginEmail">Email</label>
@@ -1096,111 +1096,127 @@
     }
 
     async function signIn() {
-      if (!isSupabaseReady()) {
-        showAuthMessage("Set Supabase keys first.", true);
-        return;
+      try {
+        if (!isSupabaseReady()) {
+          showAuthMessage("Supabase not loaded. Check your connection and reload.", true);
+          return;
+        }
+        if (keepSignedInEl) {
+          setAuthPersist(keepSignedInEl.checked);
+        }
+        if (useMagicLinkEl && useMagicLinkEl.checked) {
+          await sendMagicLink();
+          return;
+        }
+        const email = loginEmailEl.value.trim();
+        const password = loginPassEl.value;
+        if (!email) {
+          showAuthMessage("Please enter your email.", true);
+          return;
+        }
+        if (!password) {
+          showAuthMessage("Please enter your password.", true);
+          return;
+        }
+        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) {
+          showAuthMessage(error.message, true);
+          return;
+        }
+        showAuthMessage("Signed in.", false);
+        await refreshFromAuth();
+        switchPage("entry");
+      } catch (err) {
+        showAuthMessage("Sign in failed: " + err.message, true);
       }
-      if (keepSignedInEl) {
-        setAuthPersist(keepSignedInEl.checked);
-      }
-      if (useMagicLinkEl && useMagicLinkEl.checked) {
-        await sendMagicLink();
-        return;
-      }
-      const email = loginEmailEl.value.trim();
-      const password = loginPassEl.value;
-      if (!email) {
-        showAuthMessage("Please enter your email.", true);
-        return;
-      }
-      if (!password) {
-        showAuthMessage("Please enter your password.", true);
-        return;
-      }
-      const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-      if (error) {
-        showAuthMessage(error.message, true);
-        return;
-      }
-      showAuthMessage("Signed in.", false);
-      await refreshFromAuth();
-      switchPage("entry");
     }
 
     async function signUp() {
-      if (!isSupabaseReady()) {
-        showAuthMessage("Set Supabase keys first.", true);
-        return;
+      try {
+        if (!isSupabaseReady()) {
+          showAuthMessage("Supabase not loaded. Check your connection and reload.", true);
+          return;
+        }
+        if (keepSignedInEl) {
+          setAuthPersist(keepSignedInEl.checked);
+        }
+        const email = loginEmailEl.value.trim();
+        const password = loginPassEl.value;
+        if (!email) {
+          showAuthMessage("Please enter your email.", true);
+          return;
+        }
+        if (!password || password.length < 6) {
+          showAuthMessage("Please enter a password (at least 6 characters).", true);
+          return;
+        }
+        const { data, error } = await supabaseClient.auth.signUp({ email, password });
+        if (error) {
+          showAuthMessage(error.message, true);
+          return;
+        }
+        if (!data.session) {
+          showAuthMessage("Account created. Please confirm your email, then sign in.", false);
+          return;
+        }
+        showAuthMessage("Account created. You can sign in now.", false);
+        await refreshFromAuth();
+        switchPage("entry");
+      } catch (err) {
+        showAuthMessage("Sign up failed: " + err.message, true);
       }
-      if (keepSignedInEl) {
-        setAuthPersist(keepSignedInEl.checked);
-      }
-      const email = loginEmailEl.value.trim();
-      const password = loginPassEl.value;
-      if (!email) {
-        showAuthMessage("Please enter your email.", true);
-        return;
-      }
-      if (!password || password.length < 6) {
-        showAuthMessage("Please enter a password (at least 6 characters).", true);
-        return;
-      }
-      const { data, error } = await supabaseClient.auth.signUp({ email, password });
-      if (error) {
-        showAuthMessage(error.message, true);
-        return;
-      }
-      if (!data.session) {
-        showAuthMessage("Account created. Please confirm your email, then sign in.", false);
-        return;
-      }
-      showAuthMessage("Account created. You can sign in now.", false);
-      await refreshFromAuth();
-      switchPage("entry");
     }
 
     async function sendMagicLink() {
-      if (!isSupabaseReady()) {
-        showAuthMessage("Set Supabase keys first.", true);
-        return;
+      try {
+        if (!isSupabaseReady()) {
+          showAuthMessage("Supabase not loaded. Check your connection and reload.", true);
+          return;
+        }
+        if (keepSignedInEl) {
+          setAuthPersist(keepSignedInEl.checked);
+        }
+        const email = loginEmailEl.value.trim();
+        if (!email) {
+          showAuthMessage("Please enter your email.", true);
+          return;
+        }
+        const { error } = await supabaseClient.auth.signInWithOtp({
+          email,
+          options: { emailRedirectTo: window.location.href }
+        });
+        if (error) {
+          showAuthMessage(error.message, true);
+          return;
+        }
+        showAuthMessage("Magic link sent. Check your email.", false);
+      } catch (err) {
+        showAuthMessage("Magic link failed: " + err.message, true);
       }
-      if (keepSignedInEl) {
-        setAuthPersist(keepSignedInEl.checked);
-      }
-      const email = loginEmailEl.value.trim();
-      if (!email) {
-        showAuthMessage("Please enter your email.", true);
-        return;
-      }
-      const { error } = await supabaseClient.auth.signInWithOtp({
-        email,
-        options: { emailRedirectTo: window.location.href }
-      });
-      if (error) {
-        showAuthMessage(error.message, true);
-        return;
-      }
-      showAuthMessage("Magic link sent. Check your email.", false);
     }
 
     async function resetPassword() {
-      if (!isSupabaseReady()) {
-        showAuthMessage("Set Supabase keys first.", true);
-        return;
+      try {
+        if (!isSupabaseReady()) {
+          showAuthMessage("Supabase not loaded. Check your connection and reload.", true);
+          return;
+        }
+        const email = loginEmailEl.value.trim();
+        if (!email) {
+          showAuthMessage("Please enter your email.", true);
+          return;
+        }
+        const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.href
+        });
+        if (error) {
+          showAuthMessage(error.message, true);
+          return;
+        }
+        showAuthMessage("Password reset email sent.", false);
+      } catch (err) {
+        showAuthMessage("Reset failed: " + err.message, true);
       }
-      const email = loginEmailEl.value.trim();
-      if (!email) {
-        showAuthMessage("Please enter your email.", true);
-        return;
-      }
-      const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.href
-      });
-      if (error) {
-        showAuthMessage(error.message, true);
-        return;
-      }
-      showAuthMessage("Password reset email sent.", false);
     }
 
     async function saveProfileFromInputs() {

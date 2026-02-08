@@ -628,8 +628,8 @@
                 <canvas id="chart" class="chart"></canvas>
               </div>
               <div class="legend">
-                <div><span class="swatch" style="background:#d76b2d"></span>Daily</div>
-                <div><span class="swatch" style="background:#1f6e62"></span>7-day avg</div>
+                <div><span class="swatch" style="background:#2d7bff"></span>Daily</div>
+                <div><span class="swatch" style="background:#7b4dff"></span>7-day avg</div>
               </div>
             </section>
           </section>
@@ -1299,35 +1299,20 @@
       }
       ctx.stroke();
 
-      const areaGradient = ctx.createLinearGradient(0, padding, 0, height - padding);
-      areaGradient.addColorStop(0, "rgba(215,107,45,0.35)");
-      areaGradient.addColorStop(1, "rgba(215,107,45,0.02)");
+      const barWidth = Math.max(6, Math.min(18, (width - padding * 2) / points.length * 0.6));
+      const barGradient = ctx.createLinearGradient(0, padding, 0, height - padding);
+      barGradient.addColorStop(0, "rgba(45,123,255,0.85)");
+      barGradient.addColorStop(1, "rgba(255,94,168,0.55)");
 
-      ctx.beginPath();
-      points.forEach((p, i) => {
+      points.forEach((p) => {
         const x = xFor(p.date);
         const y = yFor(p.value);
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+        const h = height - padding - y;
+        ctx.fillStyle = barGradient;
+        ctx.fillRect(x - barWidth / 2, y, barWidth, h);
       });
-      ctx.lineTo(xFor(points[points.length - 1].date), height - padding);
-      ctx.lineTo(xFor(points[0].date), height - padding);
-      ctx.closePath();
-      ctx.fillStyle = areaGradient;
-      ctx.fill();
 
-      ctx.strokeStyle = "#d76b2d";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      points.forEach((p, i) => {
-        const x = xFor(p.date);
-        const y = yFor(p.value);
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      });
-      ctx.stroke();
-
-      ctx.strokeStyle = "#1f6e62";
+      ctx.strokeStyle = "#7b4dff";
       ctx.lineWidth = 2.5;
       ctx.beginPath();
       avgValues.forEach((v, i) => {

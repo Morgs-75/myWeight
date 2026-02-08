@@ -702,7 +702,7 @@
         <button id="closeSettings" class="icon-btn">Close</button>
       </div>
       <div class="note" id="authStatus">Auth: Not connected</div>
-      <button id="signOutBtn" class="ghost" style="margin:10px 0;">Sign Out</button>
+      <button id="signOutBtn" class="ghost" style="margin:10px 0;">Log Out</button>
       <label for="defaultUnit">Default Unit</label>
       <select id="defaultUnit">
         <option value="lb">lb</option>
@@ -907,7 +907,7 @@
     }
 
     function loadUnitLocal() {
-      return localStorage.getItem(UNIT_KEY) || "lb";
+      return localStorage.getItem(UNIT_KEY) || "kg";
     }
 
     async function loadUnit() {
@@ -919,9 +919,9 @@
           .maybeSingle();
         if (error) {
           console.error(error);
-          return "lb";
+          return "kg";
         }
-        return data?.unit || "lb";
+        return data?.unit || "kg";
       }
       return loadUnitLocal();
     }

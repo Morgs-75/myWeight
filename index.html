@@ -1197,6 +1197,7 @@
         chart_step: chartStepEl.value ? Number(chartStepEl.value) : null
       });
       showAuthMessage("Settings saved.", false);
+      resizeCanvas();
       renderSafe();
       closeSettings();
     }

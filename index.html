@@ -1318,11 +1318,8 @@
 
       if (points.length < 1) return;
 
-      const minDate = points[0].date;
-      const maxDate = points[points.length - 1].date;
-
       const padding = 36;
-      const spanMs = Math.max(1, maxDate.getTime() - minDate.getTime());
+      const xStep = points.length > 1 ? (width - padding * 2) / (points.length - 1) : 0;
 
       const values = points.map(p => p.value);
       const avgValues = computeAvgSeries(values);
@@ -1330,8 +1327,8 @@
       const maxVal = Math.max(...values, ...avgValues);
       const valSpan = maxVal - minVal || 1;
 
-      function xFor(date) {
-        return padding + ((date.getTime() - minDate.getTime()) / spanMs) * (width - padding * 2);
+      function xForIndex(i) {
+        return padding + i * xStep;
       }
 
       function yFor(value) {
@@ -1353,8 +1350,8 @@
       barGradient.addColorStop(0, "rgba(45,123,255,0.85)");
       barGradient.addColorStop(1, "rgba(255,94,168,0.55)");
 
-      points.forEach((p) => {
-        const x = xFor(p.date);
+      points.forEach((p, i) => {
+        const x = xForIndex(i);
         const y = yFor(p.value);
         const h = height - padding - y;
         ctx.fillStyle = barGradient;
@@ -1365,7 +1362,7 @@
       ctx.lineWidth = 2.5;
       ctx.beginPath();
       avgValues.forEach((v, i) => {
-        const x = xFor(points[i].date);
+        const x = xForIndex(i);
         const y = yFor(v);
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);

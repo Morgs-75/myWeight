@@ -438,12 +438,12 @@
     }
 
     @keyframes splash-fade {
-      0%, 80% { opacity: 1; visibility: visible; }
+      0%, 60% { opacity: 1; visibility: visible; }
       100% { opacity: 0; visibility: hidden; }
     }
 
     .splash {
-      animation: splash-fade 3.5s ease forwards;
+      animation: splash-fade 1.2s ease forwards;
     }
 
     .splash-card {
@@ -730,7 +730,7 @@
     </div>
   </div>
 
-  <script>setTimeout(function(){var s=document.getElementById("splash");if(s)s.classList.add("hidden");},3000);</script>
+  <script>setTimeout(function(){var s=document.getElementById("splash");if(s)s.classList.add("hidden");},1500);</script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <div class="modal-backdrop" id="settingsBackdrop" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
